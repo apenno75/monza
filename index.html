@@ -7,32 +7,66 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
     <style>
         body { font-family: sans-serif; background: #222; color: white; text-align: center; margin: 0; padding: 10px; }
-        #scoreboard { margin: 10px 0; font-size: 1.2rem; background: #333; padding: 10px; border-radius: 8px; min-height: 30px; }
-        #game-container { display: flex; justify-content: center; }
+        
+        /* Header e Controlli */
+        .header-container { display: flex; justify-content: space-between; align-items: center; max-width: 760px; margin: 0 auto 10px auto; }
+        h1 { margin: 0; font-size: 1.8rem; }
+        .btn-reset { background: #ff3333; color: white; border: none; padding: 10px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 1rem; }
+        .btn-reset:hover { background: #cc0000; }
+
+        #scoreboard { max-width: 740px; margin: 10px auto; font-size: 1.2rem; background: #333; padding: 10px; border-radius: 8px; min-height: 30px; }
+        #game-container { display: flex; justify-content: center; position: relative; }
+        
+        /* Griglia e Celle */
         .grid { display: grid; grid-template-columns: repeat(30, 25px); grid-template-rows: repeat(20, 25px); gap: 1px; background: #222; padding: 5px; border: 3px solid #fff; }
-        .cell { width: 25px; height: 25px; background: #1a5e1a; display: flex; align-items: center; justify-content: center; font-size: 14px; } 
+        .cell { width: 25px; height: 25px; background: #1a5e1a; display: flex; align-items: center; justify-content: center; font-size: 14px; position: relative; } 
         .track { background: #555; } 
-        .p1 { background: #ff3333; border-radius: 50%; color: white; font-weight: bold; box-shadow: 0 0 8px #ff3333; } 
-        .p2 { background: #3333ff; border-radius: 50%; color: white; font-weight: bold; box-shadow: 0 0 8px #3333ff; } 
+        
+        /* Celle Speciali */
+        .start-line { background: #2e7d32 !important; color: #fff; font-weight: bold; font-size: 11px; } /* Verde scuro partenza */
+        .finish-line { background: #fff !important; color: #000; font-weight: bold; font-size: 11px; background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 10px 10px; }
+        
+        /* Auto Piloti */
+        .p1 { background: #ff3333; border-radius: 50%; color: white; font-weight: bold; box-shadow: 0 0 8px #ff3333; z-index: 10; } 
+        .p2 { background: #3333ff; border-radius: 50%; color: white; font-weight: bold; box-shadow: 0 0 8px #3333ff; z-index: 10; } 
         .crash { background: #ffaa00 !important; animation: blink 0.3s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-        /* Stili per il nuovo Feed dei QR Code in basso */
+        /* Schermata Vittoria Overlay */
+        #winner-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; flex-direction: column; justify-content: center; align-items: center; border-radius: 5px; }
+        #winner-box { background: #333; padding: 30px; border-radius: 15px; border: 4px solid #ffcc00; max-width: 400px; box-shadow: 0 0 20px #ffcc00; }
+        #winner-box h2 { color: #ffcc00; margin-top: 0; font-size: 2.2rem; }
+        #winner-box p { font-size: 1.3rem; margin: 15px 0; }
+
+        /* Feed Scansioni */
         #feed-container { max-width: 760px; margin: 20px auto 0 auto; background: #111; border: 2px solid #444; border-radius: 8px; padding: 15px; text-align: left; }
         #feed-container h3 { margin-top: 0; color: #ffcc00; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        #log-list { list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; font-family: monospace; }
+        #log-list { list-style: none; padding: 0; margin: 0; max-height: 120px; overflow-y: auto; font-family: monospace; }
         .log-item { padding: 6px 10px; border-bottom: 1px solid #222; font-size: 0.95rem; }
-        .log-item:first-child { background: #2a2a2a; color: #fff; font-weight: bold; } /* Evidenzia l'ultima mossa */
+        .log-item:first-child { background: #2a2a2a; color: #fff; font-weight: bold; } 
         .log-time { color: #888; margin-right: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>🏎️ Monza F1 Live Display</h1>
+    <div class="header-container">
+        <h1>🏎️ Monza F1 Live Display</h1>
+        <button class="btn-reset" onclick="resetGara()">🔄 Riavvia Gara</button>
+    </div>
+
     <div id="scoreboard">Inizializzazione tracciato...</div>
     
     <div id="game-container">
         <div id="grid" class="grid"></div>
+        
+        <!-- Schermata Vittoria -->
+        <div id="winner-overlay">
+            <div id="winner-box">
+                <h2>🏆 TRAGUARDO!</h2>
+                <p id="winner-text">Il pilota X ha vinto la gara!</p>
+                <button class="btn-reset" onclick="resetGara()">Gioca Ancora 🔄</button>
+            </div>
+        </div>
     </div>
 
     <div id="feed-container">
@@ -50,12 +84,25 @@
         const GRID_COLS = 30;
         const GRID_ROWS = 20;
         let lastCheckedId = 0; 
+        let isGameActive = true;
         
+        // Mappa: 0 = Erba, 1 = Pista, 2 = Partenza, 3 = Arrivo
         const monzaMap = Array(GRID_ROWS).fill(0).map(() => Array(GRID_COLS).fill(0));
+        
+        // Rettilineo inferiore (Pista)
         for(let x=4; x<26; x++) { monzaMap[12][x] = 1; monzaMap[13][x] = 1; }
-        for(let y=5; y<=12; y++) { monzaMap[y][25] = 1; monzaMap[y][24] = 1; }
+        // Curva e rettilineo destro
+        for(let y=5; y<=12; y++) { monzaMap[y][24] = 1; monzaMap[y][25] = 1; }
+        // Rettilineo superiore
         for(let x=10; x<25; x++) { monzaMap[5][x] = 1; monzaMap[6][x] = 1; }
+        // Curva e rettilineo sinistro
         for(let y=5; y<=13; y++) { monzaMap[y][4] = 1; monzaMap[y][5] = 1; }
+        
+        // Posizionamento PARTENZA (x=6, nel rettilineo inferiore)
+        monzaMap[12][6] = 2; monzaMap[13][6] = 2;
+        
+        // Posizionamento ARRIVO (x=9, prima della curva a sinistra per completare il giro)
+        monzaMap[12][9] = 3; monzaMap[13][9] = 3;
         
         let players = {};
 
@@ -66,7 +113,12 @@
                 for (let x = 0; x < GRID_COLS; x++) {
                     const cell = document.createElement('div');
                     cell.classList.add('cell');
-                    if (monzaMap[y][x] === 1) cell.classList.add('track');
+                    
+                    const cellType = monzaMap[y][x];
+                    if (cellType >= 1) cell.classList.add('track');
+                    if (cellType === 2) { cell.classList.add('start-line'); cell.innerText = "🏁"; }
+                    if (cellType === 3) { cell.classList.add('finish-line'); cell.innerText = "🏁"; }
+                    
                     cell.id = `c-${x}-${y}`;
                     gridDiv.appendChild(cell);
                 }
@@ -94,38 +146,29 @@
             document.getElementById('scoreboard').innerText = scoreText || "Nessun pilota in pista. Invia una mossa dal telefono!";
         }
 
-        // Funzione per aggiungere la scansione nel box in basso
         function aggiungiAFeed(pilota, comando) {
             const logList = document.getElementById('log-list');
-            
-            // Rimuove la scritta iniziale di attesa al primo inserimento
             if (logList.children.length === 1 && logList.children[0].style.color === "rgb(102, 102, 102)") {
                 logList.innerHTML = "";
             }
-
             const oraAttuale = new Date().toLocaleTimeString();
             const nuovoLog = document.createElement('li');
             nuovoLog.classList.add('log-item');
-            
-            // Colore differente in base al comando o all'incidente
-            let dettagliComando = `ha scansionato ➡️ <strong>${comando}</strong>`;
-            if (comando.includes('?') || comando === '') dettagliComando = `ha scansionato un codice non valido.`;
-
-            nuovoLog.innerHTML = `<span class="log-time">[${oraAttuale}]</span> 👤 <strong>${pilota}</strong> ${dettagliComando}`;
-            
-            // Inserisce l'ultimo evento in cima alla lista
+            nuovoLog.innerHTML = `<span class="log-time">[${oraAttuale}]</span> 👤 <strong>${pilota}</strong> ha scansionato ➡️ <strong>${comando}</strong>`;
             logList.insertBefore(nuovoLog, logList.firstChild);
         }
 
         function gestisciMossa(name, command) {
+            if (!isGameActive) return; // Se qualcuno ha vinto, blocca tutto
+
             if (!command || !command.includes(':')) {
                 aggiungiAFeed(name, "COMANDO ERRATO");
                 return;
             }
 
-            // Aggiunge la notifica nel feed visivo in basso
             aggiungiAFeed(name, command);
 
+            // Inizializzazione sulla linea di partenza (x=6)
             if (!players[name]) {
                 let autoAttuali = Object.keys(players).length;
                 if(autoAttuali >= 2) return; 
@@ -141,8 +184,9 @@
             let targetX = p.x;
             let targetY = p.y;
 
-            if (direzione === 'AVANTI') targetX += passi;
-            if (direzione === 'INDIETRO') targetX -= passi;
+            // NUOVI COMANDI GEOMETRICI DIRETTI
+            if (direzione === 'DESTRA' || direzione === 'AVANTI') targetX += passi;
+            if (direzione === 'SINISTRA' || direzione === 'INDIETRO') targetX -= passi;
             if (direzione === 'SU') targetY -= passi;
             if (direzione === 'GIU') targetY += passi;
 
@@ -152,6 +196,7 @@
             p.x = targetX;
             p.y = targetY;
 
+            // Controllo fuori pista (erba)
             if (monzaMap[p.y][p.x] === 0) {
                 p.penalties += 1;
                 p.isCrashed = true;
@@ -159,15 +204,32 @@
 
             updateUI();
 
+            // CONTROLLO ARRIVO / VITTORIA (Cella tipo 3)
+            if (monzaMap[p.y][p.x] === 3) {
+                isGameActive = false;
+                document.getElementById('winner-text').innerHTML = `🏁 Il pilota <strong>${name}</strong> vince la gara!<br>Penalità accumulate: ${p.penalties}`;
+                document.getElementById('winner-overlay').style.display = 'flex';
+                return;
+            }
+
             if(p.isCrashed) {
                 setTimeout(() => { p.isCrashed = false; updateUI(); }, 1000);
             }
         }
 
+        // FUNZIONE RESET: Riposiziona tutto all'inizio
+        function resetGara() {
+            players = {};
+            isGameActive = true;
+            document.getElementById('winner-overlay').style.display = 'none';
+            document.getElementById('log-list').innerHTML = '<li class="log-item" style="color: #666;">Gara resettata. In attesa di nuove scansioni...</li>';
+            updateUI();
+        }
+
         async function fetchNuoveMosse() {
-            if (!db) return;
+            if (!db || !isGameActive) return;
             try {
-                const { data, error } = await db
+                const { data } = await db
                     .from('moves')
                     .select('*')
                     .gt('id', lastCheckedId)
