@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -78,17 +78,37 @@
         const GRID_ROWS = 20;
         let lastCheckedId = 0; 
         let isGameActive = true;
+
+        // =========================================================================
+        // CONFIGURAZIONE VELOCE PARTENZA E ARRIVO (SUDDIVISO SU DUE COLONNE)
+        // =========================================================================
+        const COLONNA_PARTENZA   = 10; // Colonna di partenza per entrambi i piloti
+        const RIGA_PARTENZA_P1   = 5;  // Corsia superiore rettilineo in alto
+        const RIGA_PARTENZA_P2   = 6;  // Corsia inferiore rettilineo in alto
+        
+        // MODIFICA QUI: Puoi impostare due colonne diverse per l'arrivo nel rettilineo inferiore
+        const COLONNA_ARRIVO_P1  = 5; // Colonna traguardo per il Pilota 1 (corsia alta, riga 12)
+        const COLONNA_ARRIVO_P2  = 4; // Colonna traguardo per il Pilota 2 (corsia bassa, riga 13)
+        
+        const RIGA_ARRIVO_P1     = 5; // Corsia superiore rettilineo in basso
+        const RIGA_ARRIVO_P2     = 5; // Corsia inferiore rettilineo in basso
+        // =========================================================================
         
         const monzaMap = Array(GRID_ROWS).fill(0).map(() => Array(GRID_COLS).fill(0));
         
-        // Configurazione Pista
-        for(let x=4; x<26; x++) { monzaMap[12][x] = 1; monzaMap[13][x] = 1; }
-        for(let y=5; y<=12; y++) { monzaMap[y][24] = 1; monzaMap[y][25] = 1; }
-        for(let x=10; x<25; x++) { monzaMap[5][x] = 1; monzaMap[6][x] = 1; }
-        for(let y=5; y<=13; y++) { monzaMap[y][4] = 1; monzaMap[y][5] = 1; }
+        // Configurazione Asfalto Pista
+        for(let x=4; x<26; x++) { monzaMap[12][x] = 1; monzaMap[13][x] = 1; } // Rettilineo inferiore
+        for(let y=5; y<=12; y++) { monzaMap[y][24] = 1; monzaMap[y][25] = 1; } // Curva destra
+        for(let x=10; x<25; x++) { monzaMap[5][x] = 1; monzaMap[6][x] = 1; }   // Rettilineo superiore
+        for(let y=5; y<=13; y++) { monzaMap[y][4] = 1; monzaMap[y][5] = 1; }   // Curva sinistra
         
-        monzaMap[12][6] = 2; monzaMap[13][6] = 2; // PARTENZA
-        monzaMap[12][9] = 3; monzaMap[13][9] = 3; // ARRIVO
+        // Applicazione della Partenza (2) sul tracciato
+        monzaMap[RIGA_PARTENZA_P1][COLONNA_PARTENZA] = 2; 
+        monzaMap[RIGA_PARTENZA_P2][COLONNA_PARTENZA] = 2; 
+        
+        // Applicazione dei due Arrivi differenziati (3) sul tracciato
+        monzaMap[RIGA_ARRIVO_P1][COLONNA_ARRIVO_P1] = 3; 
+        monzaMap[RIGA_ARRIVO_P2][COLONNA_ARRIVO_P2] = 3;
         
         let players = {};
 
@@ -147,10 +167,7 @@
         function gestisciMossa(name, command) {
             if (!isGameActive) return;
 
-            // Se arriva una mossa da un pilota non censito nei primi due slot predefiniti, lo associamo al primo nome disponibile
-            let playerKey = name;
             let playerKeys = Object.keys(players);
-            
             if (!players[name]) {
                 if (playerKeys.includes("Pilota 1") && players["Pilota 1"].name === "In attesa...") {
                     players[name] = players["Pilota 1"];
@@ -161,7 +178,7 @@
                     players[name].name = name;
                     delete players["Pilota 2"];
                 } else if (!playerKeys.includes(name)) {
-                    return; // Slot pieni
+                    return; 
                 }
             }
 
@@ -173,7 +190,7 @@
             aggiungiAFeed(name, command);
 
             let p = players[name];
-            if (p.isCrashed) return; // Se è in corso l'animazione dell'incidente, ignora i comandi
+            if (p.isCrashed) return; 
 
             let [direzione, passi] = command.toUpperCase().trim().split(':');
             passi = parseInt(passi) || 0;
@@ -192,27 +209,24 @@
             let lastValidY = p.y;
             let uscitoFuori = false;
 
-            // Movimento passo dopo passo per intercettare il confine preciso dell'erba
             for (let i = 0; i < passi; i++) {
                 let nextX = Math.max(0, Math.min(GRID_COLS - 1, currentX + stepX));
                 let nextY = Math.max(0, Math.min(GRID_ROWS - 1, currentY + stepY));
 
                 if (monzaMap[nextY][nextX] === 0) {
-                    // Cella successiva è erba: fermati qui sulla prima casella d'erba
                     currentX = nextX;
                     currentY = nextY;
                     uscitoFuori = true;
                     break;
                 } else {
-                    // Resta in pista: aggiorna le ultime coordinate valide
                     lastValidX = nextX;
                     lastValidY = nextY;
                     currentX = nextX;
                     currentY = nextY;
                     
-                    // Se passa sul traguardo durante il movimento, si ferma subito
+                    // Si ferma immediatamente se tocca la propria casella traguardo specifica
                     if (monzaMap[currentY][currentX] === 3) {
-                        break;
+                        break; 
                     }
                 }
             }
@@ -225,7 +239,6 @@
                 p.isCrashed = true;
                 updateUI();
 
-                // Riposizionamento automatico sulla pista dopo 1.2 secondi
                 setTimeout(() => {
                     p.x = lastValidX;
                     p.y = lastValidY;
@@ -235,7 +248,6 @@
             } else {
                 updateUI();
 
-                // Controllo Vittoria
                 if (monzaMap[p.y][p.x] === 3) {
                     isGameActive = false;
                     document.getElementById('winner-text').innerHTML = `🏁 Il pilota <strong>${name}</strong> vince la gara!<br>Penalità accumulate: ${p.penalties}`;
@@ -244,15 +256,28 @@
             }
         }
 
-        function resetGara() {
+        async function resetGara() {
+            document.getElementById('scoreboard').innerText = "Svuotamento database in corso...";
+            
+            if (db) {
+                try {
+                    const { error } = await db.from('moves').delete().gt('id', 0);
+                    if (error) console.error("Errore svuotamento DB:", error.message);
+                } catch (err) {
+                    console.error("Errore di rete durante il reset:", err);
+                }
+            }
+
             isGameActive = true;
-            // Inizializza i due piloti direttamente sulla linea di partenza
+            lastCheckedId = 0; 
+            
             players = {
-                "Pilota 1": { name: "In attesa...", x: 6, y: 12, penalties: 0, isCrashed: false },
-                "Pilota 2": { name: "In attesa...", x: 6, y: 13, penalties: 0, isCrashed: false }
+                "Pilota 1": { name: "In attesa...", x: COLONNA_PARTENZA, y: RIGA_PARTENZA_P1, penalties: 0, isCrashed: false },
+                "Pilota 2": { name: "In attesa...", x: COLONNA_PARTENZA, y: RIGA_PARTENZA_P2, penalties: 0, isCrashed: false }
             };
+            
             document.getElementById('winner-overlay').style.display = 'none';
-            document.getElementById('log-list').innerHTML = '<li class="log-item" style="color: #666;">Gara resettata. Auto schierate in griglia!</li>';
+            document.getElementById('log-list').innerHTML = '<li class="log-item" style="color: #666;">Database pulito. Griglia rigenerata!</li>';
             updateUI();
         }
 
@@ -283,7 +308,14 @@
                 if (data && data.length > 0) {
                     lastCheckedId = data[0].id;
                 }
-                resetGara(); // Inizializza subito le vetture visibili alla partenza
+                
+                isGameActive = true;
+                players = {
+                    "Pilota 1": { name: "In attesa...", x: COLONNA_PARTENZA, y: RIGA_PARTENZA_P1, penalties: 0, isCrashed: false },
+                    "Pilota 2": { name: "In attesa...", x: COLONNA_PARTENZA, y: RIGA_PARTENZA_P2, penalties: 0, isCrashed: false }
+                };
+                updateUI();
+                
                 setInterval(fetchNuoveMosse, 1000);
             } catch (e) {
                 document.getElementById('scoreboard').innerText = "Errore: " + e.message;
@@ -293,4 +325,4 @@
         init();
     </script>
 </body>
-</html>
+</html> 
