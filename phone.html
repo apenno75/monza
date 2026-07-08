@@ -3,104 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Volante F1 QR</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
+    <title>Monza F1 - Scanner Pilota</title>
+    <!-- Libreria per QR Code e Supabase -->
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #111; color: white; padding: 20px; margin: 0; }
-        input, button { padding: 15px; font-size: 1.1rem; margin: 10px; border-radius: 8px; border: none; width: 85%; }
-        button { background: #e10600; color: white; font-weight: bold; cursor: pointer; }
-        #reader { width: 100%; max-width: 350px; margin: auto; background: black; border: 2px solid #fff; }
-        #status { font-size: 1.2rem; margin-top: 15px; color: #ffcc00; }
+        body { font-family: sans-serif; background: #111; color: white; text-align: center; margin: 0; padding: 20px; }
+        #reader { width: 100%; max-width: 400px; margin: 0 auto; background: #222; border-radius: 12px; overflow: hidden; }
+        button { background: #00cc66; color: black; border: none; padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 20px; width: 100%; max-width: 400px; display: none; }
+        button:active { background: #00aa55; }
+        #status { margin: 20px 0; font-size: 1.1rem; color: #aaa; }
+        .success { color: #00ffcc; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>🕹️ Volante F1 QR</h1>
+    <h1>🏎️ Scanner Comando F1</h1>
     
-    <div id="setup-zone">
-        <p>Inserisci il tuo Nome Pilota Univoco:</p>
-        <input type="text" id="username" placeholder="Es: Leclerc">
-        <br>
-        <button onclick="register()">Sblocca Motore</button>
-    </div>
+    <div id="status">Inizializzazione...</div>
 
-    <div id="drive-zone" style="display:none;">
-        <h3 id="driver-tag">Pilota: </h3>
-        <div id="reader"></div>
-        <p id="status">Inquadra un QR Code direzionale</p>
-    </div>
+    <!-- Area Fotocamera -->
+    <div id="reader"></div>
+
+    <!-- Pulsante di sblocco (nascosto di default) -->
+    <button id="btn-riattiva" onclick="riattivaScanner()">🔄 ABILITA PROSSIMA SCANSIONE</button>
 
     <script>
     const SUPABASE_URL = "https://erukzvrtjnvyzjvfuirn.supabase.co";
     const SUPABASE_KEY = "sb_publishable_FDhQ03affjzeyhCHuoKulg_Rp7PdyLM";
-        
-        let db = null;
-        let myName = "";
-        let html5QrcodeScanner;
+        const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        function register() {
-            const nameInput = document.getElementById('username').value.trim();
-            if (!nameInput) {
-                alert("Inserisci un nome valido!");
-                return;
-            }
-            
-            try {
-                if (typeof supabase !== 'undefined') {
-                    db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                } else {
-                    alert("Libreria Supabase non caricata.");
-                    return;
-                }
-            } catch (err) {
-                alert("Errore client: " + err.message);
-                return;
-            }
-
-            myName = nameInput;
-            document.getElementById('setup-zone').style.display = 'none';
-            document.getElementById('drive-zone').style.display = 'block';
-            document.getElementById('driver-tag').innerText = "Pilota Attivo: " + myName;
-            
-            startScanner();
+        // Recupera il nome del pilota salvato o lo chiede all'inizio
+        let playerName = localStorage.getItem('f1_player_name');
+        if (!playerName) {
+            playerName = prompt("Inserisci il tuo nome da Pilota:") || "Anonimo";
+            localStorage.setItem('f1_player_name', playerName);
         }
 
-        function startScanner() {
-            html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-                fps: 10, 
-                qrbox: { width: 220, height: 220 } 
+        let html5QrcodeScanner = null;
+        let isScanning = false;
+
+        function avviaScanner() {
+            document.getElementById('status').innerText = "Inquadra il QR Code del movimento...";
+            document.getElementById('btn-riattiva').style.display = 'none';
+            document.getElementById('reader').style.display = 'block';
+            isScanning = true;
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, // Usa la fotocamera posteriore
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                onScanSuccess,
+                onScanFailure
+            ).catch(err => {
+                document.getElementById('status').innerText = "Errore fotocamera: " + err;
             });
-            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
         }
 
         async function onScanSuccess(decodedText) {
-            document.getElementById('status').innerText = "Invio in corso...";
+            // Se lo scanner è già stato stoppato in questo millesimo di secondo, esce
+            if (!isScanning) return; 
             
-            try {
-                if (db) {
-                    // Catturiamo l'eventuale errore restituito da Supabase
-                    const { data, error } = await db.from('moves').insert([
-                        { player_name: myName, command: decodedText }
-                    ]);
+            isScanning = false;
+            document.getElementById('status').innerHTML = `Scansione letta: <span class="success">${decodedText}</span>. Invio in corso...`;
 
-                    if (error) {
-                        // Se Supabase rifiuta il dato, lo mostra chiaramente sul telefono
-                        alert("Errore Database: " + error.message);
-                        document.getElementById('status').innerText = "Errore: " + error.message;
-                    } else {
-                        document.getElementById('status').innerText = "Mossa salvata: " + decodedText;
-                    }
-                }
-            } catch (e) {
-                alert("Errore di rete: " + e.message);
+            // 1. STOPPA IMMEDIATAMENTE LA FOTOCAMERA
+            try {
+                await html5QrcodeScanner.stop();
+                document.getElementById('reader').style.display = 'none'; // Nasconde il riquadro video
+            } catch (err) {
+                console.error("Errore nello stop dello scanner:", err);
             }
 
-            html5QrcodeScanner.pause(true);
-            setTimeout(() => { html5QrcodeScanner.resume(); }, 2000);
+            // 2. INVIA IL DATI A SUPABASE
+            try {
+                const { error } = await db.from('moves').insert([
+                    { player_name: playerName, command: decodedText.trim() }
+                ]);
+
+                if (error) throw error;
+
+                // 3. MOSTRA IL PULSANTE DI SBLOCCO
+                document.getElementById('status').innerHTML = `✅ Mossa <span class="success">${decodedText}</span> inviata! <br>Premi il tasto sotto per muoverti di nuovo.`;
+                document.getElementById('btn-riattiva').style.display = 'block';
+
+            } catch (err) {
+                document.getElementById('status').innerText = "Errore di rete: " + err.message;
+                // In caso di errore di rete permette comunque di riprovare
+                document.getElementById('btn-riattiva').style.display = 'block';
+            }
         }
 
-        function onScanFailure(error) {}
+        function onScanFailure(error) {
+            // Ignoriamo gli errori di mancato rilevamento continui per non intasare i log
+        }
+
+        // Funzione legata al pulsante per ripartire
+        function riattivaScanner() {
+            avviaScanner();
+        }
+
+        // Avvio automatico alla prima apertura della pagina
+        window.onload = avviaScanner;
     </script>
 </body>
 </html>
