@@ -35,8 +35,8 @@
         // CONFIGURAZIONE SUPABASE (Inserisci le stesse credenziali dell'index.html)
         const SUPABASE_URL = "https://erukzvrtjnvyzjvfuirn.supabase.co";
         const SUPABASE_KEY = "sb_publishable_FDhQ03affjzeyhCHuoKulg_Rp7PdyLM";
-        const supabase = client.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+        //const supabase = client.createClient(SUPABASE_URL, SUPABASE_KEY);
+		const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let myName = "";
         let html5QrcodeScanner;
 

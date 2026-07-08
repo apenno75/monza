@@ -30,8 +30,8 @@
         // CONFIGURAZIONE SUPABASE (Sostituisci con i tuoi dati gratuiti)
         const SUPABASE_URL = "https://erukzvrtjnvyzjvfuirn.supabase.co";
         const SUPABASE_KEY = "sb_publishable_FDhQ03affjzeyhCHuoKulg_Rp7PdyLM";
-        const supabase = client.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+        //const supabase = client.createClient(SUPABASE_URL, SUPABASE_KEY);
+		const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const GRID_COLS = 30;
         const GRID_ROWS = 20;
         
