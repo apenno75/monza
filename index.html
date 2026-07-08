@@ -80,35 +80,41 @@
         let isGameActive = true;
 
         // =========================================================================
-        // CONFIGURAZIONE VELOCE PARTENZA E ARRIVO (SUDDIVISO SU DUE COLONNE)
+        // CONFIGURAZIONE RAPIDA PARTENZA E ARRIVO DINAMICI
         // =========================================================================
-        const COLONNA_PARTENZA   = 10; // Colonna di partenza per entrambi i piloti
-        const RIGA_PARTENZA_P1   = 5;  // Corsia superiore rettilineo in alto
-        const RIGA_PARTENZA_P2   = 6;  // Corsia inferiore rettilineo in alto
+        const COLONNA_PARTENZA   = 9; // Colonna dello schieramento iniziale
+        const RIGA_PARTENZA_P1   = 5;  // Riga iniziale Pilota 1
+        const RIGA_PARTENZA_P2   = 6;  // Riga iniziale Pilota 2
         
-        // MODIFICA QUI: Puoi impostare due colonne diverse per l'arrivo nel rettilineo inferiore
-        const COLONNA_ARRIVO_P1  = 5; // Colonna traguardo per il Pilota 1 (corsia alta, riga 12)
-        const COLONNA_ARRIVO_P2  = 4; // Colonna traguardo per il Pilota 2 (corsia bassa, riga 13)
-        
-        const RIGA_ARRIVO_P1     = 5; // Corsia superiore rettilineo in basso
-        const RIGA_ARRIVO_P2     = 5; // Corsia inferiore rettilineo in basso
+        // MODIFICA QUI: Configura liberamente le caselle di arrivo {x: colonna, y: riga}
+        // Puoi variare sia le colonne che le righe per creare qualsiasi linea di traguardo
+        const CASELLE_ARRIVO = [
+            { x: 3, y: 4 }, // Riga 11, colonna 23
+            { x: 4, y: 4 }, // Riga 12, colonna 23
+            { x: 5, y: 4 }, // Riga 13, colonna 22 (variata riga e colonna!)
+            { x: 6, y: 4 }  // Riga 14, colonna 22 (variata riga e colonna!)
+        ];
         // =========================================================================
         
         const monzaMap = Array(GRID_ROWS).fill(0).map(() => Array(GRID_COLS).fill(0));
         
-        // Configurazione Asfalto Pista
-        for(let x=4; x<26; x++) { monzaMap[12][x] = 1; monzaMap[13][x] = 1; } // Rettilineo inferiore
-        for(let y=5; y<=12; y++) { monzaMap[y][24] = 1; monzaMap[y][25] = 1; } // Curva destra
-        for(let x=10; x<25; x++) { monzaMap[5][x] = 1; monzaMap[6][x] = 1; }   // Rettilineo superiore
-        for(let y=5; y<=13; y++) { monzaMap[y][4] = 1; monzaMap[y][5] = 1; }   // Curva sinistra
+        // Configurazione Asfalto Pista (Spessore 4 caselle)
+        for(let x = 3; x < 27; x++) { monzaMap[11][x] = 1; monzaMap[12][x] = 1; monzaMap[13][x] = 1; monzaMap[14][x] = 1; }
+        for(let y = 4; y <= 14; y++) { monzaMap[y][23] = 1; monzaMap[y][24] = 1; monzaMap[y][25] = 1; monzaMap[y][26] = 1; }
+        for(let x = 9; x < 26; x++) { monzaMap[4][x] = 1; monzaMap[5][x] = 1; monzaMap[6][x] = 1; monzaMap[7][x] = 1; }
+        for(let y = 4; y <= 14; y++) { monzaMap[y][3] = 1; monzaMap[y][4] = 1; monzaMap[y][5] = 1; monzaMap[y][6] = 1; }
         
-        // Applicazione della Partenza (2) sul tracciato
-        monzaMap[RIGA_PARTENZA_P1][COLONNA_PARTENZA] = 2; 
-        monzaMap[RIGA_PARTENZA_P2][COLONNA_PARTENZA] = 2; 
+        // Applicazione della Partenza (2)
+        for (let y = 4; y <= 7; y++) { 
+            monzaMap[y][COLONNA_PARTENZA] = 2; 
+        }
         
-        // Applicazione dei due Arrivi differenziati (3) sul tracciato
-        monzaMap[RIGA_ARRIVO_P1][COLONNA_ARRIVO_P1] = 3; 
-        monzaMap[RIGA_ARRIVO_P2][COLONNA_ARRIVO_P2] = 3;
+        // Applicazione dell'Arrivo (3) basato sull'array personalizzabile
+        CASELLE_ARRIVO.forEach(casella => {
+            if(casella.y < GRID_ROWS && casella.x < GRID_COLS) {
+                monzaMap[casella.y][casella.x] = 3;
+            }
+        });
         
         let players = {};
 
@@ -224,7 +230,7 @@
                     currentX = nextX;
                     currentY = nextY;
                     
-                    // Si ferma immediatamente se tocca la propria casella traguardo specifica
+                    // Condizione globale: se la casella corrente fa parte dell'elenco degli arrivi, la gara finisce
                     if (monzaMap[currentY][currentX] === 3) {
                         break; 
                     }
