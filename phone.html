@@ -32,7 +32,6 @@
     </div>
 
     <script>
-        // CONFIGURAZIONE CREDENZIALI
     const SUPABASE_URL = "https://erukzvrtjnvyzjvfuirn.supabase.co";
     const SUPABASE_KEY = "sb_publishable_FDhQ03affjzeyhCHuoKulg_Rp7PdyLM";
         
@@ -40,7 +39,6 @@
         let myName = "";
         let html5QrcodeScanner;
 
-        // Questa funzione ora è isolata in cima e non può saltare a causa di errori esterni
         function register() {
             const nameInput = document.getElementById('username').value.trim();
             if (!nameInput) {
@@ -48,16 +46,15 @@
                 return;
             }
             
-            // Inizializzazione sicura al momento del click
             try {
                 if (typeof supabase !== 'undefined') {
                     db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 } else {
-                    alert("Errore: la libreria Supabase non si è caricata correttamente. Controlla la connessione internet.");
+                    alert("Libreria Supabase non caricata.");
                     return;
                 }
             } catch (err) {
-                alert("Errore di configurazione database: " + err.message);
+                alert("Errore client: " + err.message);
                 return;
             }
 
@@ -78,16 +75,25 @@
         }
 
         async function onScanSuccess(decodedText) {
-            document.getElementById('status').innerText = "Mossa inviata: " + decodedText;
+            document.getElementById('status').innerText = "Invio in corso...";
             
             try {
                 if (db) {
-                    await db.from('moves').insert([
+                    // Catturiamo l'eventuale errore restituito da Supabase
+                    const { data, error } = await db.from('moves').insert([
                         { player_name: myName, command: decodedText }
                     ]);
+
+                    if (error) {
+                        // Se Supabase rifiuta il dato, lo mostra chiaramente sul telefono
+                        alert("Errore Database: " + error.message);
+                        document.getElementById('status').innerText = "Errore: " + error.message;
+                    } else {
+                        document.getElementById('status').innerText = "Mossa salvata: " + decodedText;
+                    }
                 }
             } catch (e) {
-                console.error("Errore invio dati: ", e);
+                alert("Errore di rete: " + e.message);
             }
 
             html5QrcodeScanner.pause(true);
