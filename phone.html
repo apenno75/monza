@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volante F1 QR</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #111; color: white; padding: 20px; margin: 0; }
+        input, button { padding: 15px; font-size: 1.1rem; margin: 10px; border-radius: 8px; border: none; width: 85%; }
+        button { background: #e10600; color: white; font-weight: bold; cursor: pointer; }
+        #reader { width: 100%; max-width: 350px; margin: auto; background: black; border: 2px solid #fff; }
+        #status { font-size: 1.2rem; margin-top: 15px; color: #ffcc00; }
+    </style>
+</head>
+<body>
+
+    <h1>🕹️ Volante F1 QR</h1>
+    
+    <div id="setup-zone">
+        <p>Inserisci il tuo Nome Pilota Univoco:</p>
+        <input type="text" id="username" placeholder="Es: Leclerc">
+        <br>
+        <button onclick="register()">Sblocca Motore</button>
+    </div>
+
+    <div id="drive-zone" style="display:none;">
+        <h3 id="driver-tag">Pilota: </h3>
+        <div id="reader"></div>
+        <p id="status">Inquadra un QR Code direzionale</p>
+    </div>
+
+    <script>
+        // CONFIGURAZIONE SUPABASE (Inserisci le stesse credenziali dell'index.html)
+        const SUPABASE_URL = "https://erukzvrtjnvyzjvfuirn.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_FDhQ03affjzeyhCHuoKulg_Rp7PdyLM";
+        const supabase = client.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let myName = "";
+        let html5QrcodeScanner;
+
+        function register() {
+            const nameInput = document.getElementById('username').value.trim();
+            if (!nameInput) return alert("Inserisci un nome!");
+            myName = nameInput;
+            
+            document.getElementById('setup-zone').style.display = 'none';
+            document.getElementById('drive-zone').style.display = 'block';
+            document.getElementById('driver-tag').innerText = "Pilota Attivo: " + myName;
+            
+            startScanner();
+        }
+
+        function startScanner() {
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+                fps: 10, 
+                qrbox: { width: 220, height: 220 } 
+            });
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        }
+
+        async function onScanSuccess(decodedText) {
+            document.getElementById('status').innerText = "Mossa inviata: " + decodedText;
+            
+            // Scrive direttamente la mossa sul database Cloud di Supabase
+            await supabase.from('moves').insert([
+                { player_name: myName, command: decodedText }
+            ]);
+
+            // Blocca momentaneamente la telecamera per evitare letture doppie dello stesso QR
+            html5QrcodeScanner.pause(true);
+            setTimeout(() => { html5QrcodeScanner.resume(); }, 2000);
+        }
+
+        function onScanFailure(error) {}
+    </script>
+</body>
+</html>
