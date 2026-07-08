@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monza F1 - Schermo Principale</title>
+    <title>Monza Custom F1 - Movimento Diagonale</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
     <style>
         body { font-family: sans-serif; background: #222; color: white; text-align: center; margin: 0; padding: 10px; }
@@ -19,6 +19,7 @@
         .grid { display: grid; grid-template-columns: repeat(30, 25px); grid-template-rows: repeat(20, 25px); gap: 1px; background: #222; padding: 5px; border: 3px solid #fff; }
         .cell { width: 25px; height: 25px; background: #1a5e1a; display: flex; align-items: center; justify-content: center; font-size: 14px; position: relative; } 
         .track { background: #555; } 
+        .obstacle { background: #3a3a3a !important; font-size: 12px; }
         
         .start-line { background: #2e7d32 !important; color: #fff; font-weight: bold; font-size: 11px; } 
         .finish-line { background: #fff !important; color: #000; font-weight: bold; font-size: 11px; background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 10px 10px; }
@@ -44,7 +45,7 @@
 <body>
 
     <div class="header-container">
-        <h1>🏎️ Monza F1 Live Display</h1>
+        <h1>🏎️ Monza Custom Live Display</h1>
         <button class="btn-reset" onclick="resetGara()">🔄 Riavvia Gara</button>
     </div>
 
@@ -80,14 +81,12 @@
         let isGameActive = true;
 
         // =========================================================================
-        // CONFIGURAZIONE RAPIDA PARTENZA E ARRIVO DINAMICI
+        // CONFIGURAZIONE RAPIDA PARTENZA E ARRIVO
         // =========================================================================
-        const COLONNA_PARTENZA   = 9; // Colonna dello schieramento iniziale
-        const RIGA_PARTENZA_P1   = 5;  // Riga iniziale Pilota 1
-        const RIGA_PARTENZA_P2   = 6;  // Riga iniziale Pilota 2
+        const COLONNA_PARTENZA   = 9; 
+        const RIGA_PARTENZA_P1   = 5;  
+        const RIGA_PARTENZA_P2   = 6;  
         
-        // MODIFICA QUI: Configura liberamente le caselle di arrivo {x: colonna, y: riga}
-        // Puoi variare sia le colonne che le righe per creare qualsiasi linea di traguardo
         const CASELLE_ARRIVO = [
             { x: 3, y: 4 }, // Riga 11, colonna 23
             { x: 4, y: 4 }, // Riga 12, colonna 23
@@ -98,22 +97,35 @@
         
         const monzaMap = Array(GRID_ROWS).fill(0).map(() => Array(GRID_COLS).fill(0));
         
-        // Configurazione Asfalto Pista (Spessore 4 caselle)
+        // Costruzione Mappa (Spessore 4)
         for(let x = 3; x < 27; x++) { monzaMap[11][x] = 1; monzaMap[12][x] = 1; monzaMap[13][x] = 1; monzaMap[14][x] = 1; }
         for(let y = 4; y <= 14; y++) { monzaMap[y][23] = 1; monzaMap[y][24] = 1; monzaMap[y][25] = 1; monzaMap[y][26] = 1; }
-        for(let x = 9; x < 26; x++) { monzaMap[4][x] = 1; monzaMap[5][x] = 1; monzaMap[6][x] = 1; monzaMap[7][x] = 1; }
+        
+        // Variante Chicane superiore
+        for(let x = 9; x < 26; x++) { 
+            if (x >= 16 && x <= 19) {
+                monzaMap[6][x] = 1; monzaMap[7][x] = 1; monzaMap[8][x] = 1; monzaMap[9][x] = 1;
+            } else {
+                monzaMap[4][x] = 1; monzaMap[5][x] = 1; monzaMap[6][x] = 1; monzaMap[7][x] = 1; 
+            }
+        }
+        monzaMap[6][15] = 1; monzaMap[7][15] = 1;
+        monzaMap[4][20] = 1; monzaMap[5][20] = 1;
+
         for(let y = 4; y <= 14; y++) { monzaMap[y][3] = 1; monzaMap[y][4] = 1; monzaMap[y][5] = 1; monzaMap[y][6] = 1; }
         
-        // Applicazione della Partenza (2)
-        for (let y = 4; y <= 7; y++) { 
-            monzaMap[y][COLONNA_PARTENZA] = 2; 
-        }
+        // Ostacoli fisici 🛢️
+        const ostacoli = [
+            {x: 13, y: 5}, {x: 21, y: 6}, {x: 25, y: 9}, {x: 14, y: 12}, {x: 8, y: 14}
+        ];
+        ostacoli.forEach(o => { monzaMap[o.y][o.x] = 4; });
+
+        // Partenza
+        for (let y = 4; y <= 7; y++) { monzaMap[y][COLONNA_PARTENZA] = 2; }
         
-        // Applicazione dell'Arrivo (3) basato sull'array personalizzabile
+        // Arrivo
         CASELLE_ARRIVO.forEach(casella => {
-            if(casella.y < GRID_ROWS && casella.x < GRID_COLS) {
-                monzaMap[casella.y][casella.x] = 3;
-            }
+            if(casella.y < GRID_ROWS && casella.x < GRID_COLS) { monzaMap[casella.y][casella.x] = 3; }
         });
         
         let players = {};
@@ -125,12 +137,11 @@
                 for (let x = 0; x < GRID_COLS; x++) {
                     const cell = document.createElement('div');
                     cell.classList.add('cell');
-                    
                     const cellType = monzaMap[y][x];
                     if (cellType >= 1) cell.classList.add('track');
                     if (cellType === 2) { cell.classList.add('start-line'); cell.innerText = "🏁"; }
                     if (cellType === 3) { cell.classList.add('finish-line'); cell.innerText = "🏁"; }
-                    
+                    if (cellType === 4) { cell.classList.add('obstacle'); cell.innerText = "🛢️"; }
                     cell.id = `c-${x}-${y}`;
                     gridDiv.appendChild(cell);
                 }
@@ -141,17 +152,17 @@
             drawGrid();
             let scoreText = "";
             let idx = 1;
-            
             for (let name in players) {
                 let p = players[name];
-                let statoPosizione = monzaMap[p.y][p.x] === 0 ? "⚠️ INCIDENTE" : "IN PISTA";
+                let sulTracciato = monzaMap[p.y][p.x] === 1 || monzaMap[p.y][p.x] === 2 || monzaMap[p.y][p.x] === 3;
+                let statoPosizione = !sulTracciato ? "⚠️ INCIDENTE" : "IN PISTA";
                 scoreText += `[P${idx}] ${name} - Penalità: ${p.penalties} (${statoPosizione}) | `;
                 
                 let cell = document.getElementById(`c-${p.x}-${p.y}`);
                 if (cell) {
                     cell.classList.add(`p${idx}`);
                     cell.innerText = p.isCrashed ? '💥' : `🏎️${idx}`;
-                    if (p.isCrashed || monzaMap[p.y][p.x] === 0) cell.classList.add('crash');
+                    if (p.isCrashed || !sulTracciato) cell.classList.add('crash');
                 }
                 idx++;
             }
@@ -160,14 +171,18 @@
 
         function aggiungiAFeed(pilota, comando) {
             const logList = document.getElementById('log-list');
-            if (logList.children.length === 1 && logList.children[0].style.color === "rgb(102, 102, 102)") {
-                logList.innerHTML = "";
-            }
+            if (logList.children.length === 1 && logList.children[0].style.color === "rgb(102, 102, 102)") logList.innerHTML = "";
             const oraAttuale = new Date().toLocaleTimeString();
             const nuovoLog = document.createElement('li');
             nuovoLog.classList.add('log-item');
             nuovoLog.innerHTML = `<span class="log-time">[${oraAttuale}]</span> 👤 <strong>${pilota}</strong> ha scansionato ➡️ <strong>${comando}</strong>`;
             logList.insertBefore(nuovoLog, logList.firstChild);
+        }
+
+        // Funzione helper per estrarre la direzione e i passi da una stringa tipo "SU:1"
+        function analizzaSubComando(sub) {
+            let [dir, passi] = sub.toUpperCase().trim().split(':');
+            return { direzione: dir, passi: parseInt(passi) || 0 };
         }
 
         function gestisciMossa(name, command) {
@@ -176,13 +191,9 @@
             let playerKeys = Object.keys(players);
             if (!players[name]) {
                 if (playerKeys.includes("Pilota 1") && players["Pilota 1"].name === "In attesa...") {
-                    players[name] = players["Pilota 1"];
-                    players[name].name = name;
-                    delete players["Pilota 1"];
+                    players[name] = players["Pilota 1"]; players[name].name = name; delete players["Pilota 1"];
                 } else if (playerKeys.includes("Pilota 2") && players["Pilota 2"].name === "In attesa...") {
-                    players[name] = players["Pilota 2"];
-                    players[name].name = name;
-                    delete players["Pilota 2"];
+                    players[name] = players["Pilota 2"]; players[name].name = name; delete players["Pilota 2"];
                 } else if (!playerKeys.includes(name)) {
                     return; 
                 }
@@ -194,35 +205,61 @@
             }
 
             aggiungiAFeed(name, command);
-
             let p = players[name];
-            if (p.isCrashed) return; 
+            if (p.isCrashed) return;
 
-            let [direzione, passi] = command.toUpperCase().trim().split(':');
-            passi = parseInt(passi) || 0;
+            // Suddividi eventuali comandi multipli/diagonali uniti dal segno '+'
+            let subComandi = command.split('+');
+            
+            let direzione1 = "", passi1 = 0;
+            let direzione2 = "", passi2 = 0;
 
-            let stepX = 0;
-            let stepY = 0;
+            if (subComandi.length >= 1) {
+                let c1 = analizzaSubComando(subComandi[0]);
+                direzione1 = c1.direzione; passi1 = c1.passi;
+            }
+            if (subComandi.length >= 2) {
+                let c2 = analizzaSubComando(subComandi[1]);
+                direzione2 = c2.direzione; passi2 = c2.passi;
+            }
 
-            if (direzione === 'DESTRA' || direzione === 'AVANTI') stepX = 1;
-            if (direzione === 'SINISTRA' || direzione === 'INDIETRO') stepX = -1;
-            if (direzione === 'SU') stepY = -1;
-            if (direzione === 'GIU') stepY = 1;
+            // Calcola il numero massimo di iterazioni necessarie per completare il movimento combinato
+            let passiTotali = Math.max(passi1, passi2);
 
             let currentX = p.x;
             let currentY = p.y;
             let lastValidX = p.x;
             let lastValidY = p.y;
-            let uscitoFuori = false;
+            let collisioneRilevata = false;
 
-            for (let i = 0; i < passi; i++) {
+            for (let i = 0; i < passiTotali; i++) {
+                let stepX = 0;
+                let stepY = 0;
+
+                // Gestione della prima componente del movimento
+                if (i < passi1) {
+                    if (direzione1 === 'DESTRA' || direzione1 === 'AVANTI') stepX = 1;
+                    if (direzione1 === 'SINISTRA' || direzione1 === 'INDIETRO') stepX = -1;
+                    if (direzione1 === 'SU') stepY = -1;
+                    if (direzione1 === 'GIU') stepY = 1;
+                }
+
+                // Gestione della seconda componente del movimento (se presente, es. Diagonale)
+                if (i < passi2) {
+                    if (direzione2 === 'DESTRA' || direzione2 === 'AVANTI') stepX += 1;
+                    if (direzione2 === 'SINISTRA' || direzione2 === 'INDIETRO') stepX += -1;
+                    if (direzione2 === 'SU') stepY += -1;
+                    if (direzione2 === 'GIU') stepY += 1;
+                }
+
                 let nextX = Math.max(0, Math.min(GRID_COLS - 1, currentX + stepX));
                 let nextY = Math.max(0, Math.min(GRID_ROWS - 1, currentY + stepY));
 
-                if (monzaMap[nextY][nextX] === 0) {
+                // Controllo collisione o fuoripista
+                if (monzaMap[nextY][nextX] === 0 || monzaMap[nextY][nextX] === 4) {
                     currentX = nextX;
                     currentY = nextY;
-                    uscitoFuori = true;
+                    collisioneRilevata = true;
                     break;
                 } else {
                     lastValidX = nextX;
@@ -230,7 +267,6 @@
                     currentX = nextX;
                     currentY = nextY;
                     
-                    // Condizione globale: se la casella corrente fa parte dell'elenco degli arrivi, la gara finisce
                     if (monzaMap[currentY][currentX] === 3) {
                         break; 
                     }
@@ -240,20 +276,15 @@
             p.x = currentX;
             p.y = currentY;
 
-            if (uscitoFuori) {
-                p.penalties += 1;
-                p.isCrashed = true;
+            if (collisioneRilevata) {
+                p.penalties += 1; p.isCrashed = true;
                 updateUI();
-
                 setTimeout(() => {
-                    p.x = lastValidX;
-                    p.y = lastValidY;
-                    p.isCrashed = false;
+                    p.x = lastValidX; p.y = lastValidY; p.isCrashed = false;
                     updateUI();
                 }, 1200);
             } else {
                 updateUI();
-
                 if (monzaMap[p.y][p.x] === 3) {
                     isGameActive = false;
                     document.getElementById('winner-text').innerHTML = `🏁 Il pilota <strong>${name}</strong> vince la gara!<br>Penalità accumulate: ${p.penalties}`;
@@ -264,71 +295,44 @@
 
         async function resetGara() {
             document.getElementById('scoreboard').innerText = "Svuotamento database in corso...";
-            
             if (db) {
-                try {
-                    const { error } = await db.from('moves').delete().gt('id', 0);
-                    if (error) console.error("Errore svuotamento DB:", error.message);
-                } catch (err) {
-                    console.error("Errore di rete durante il reset:", err);
-                }
+                try { await db.from('moves').delete().gt('id', 0); } catch (err) { console.error(err); }
             }
-
-            isGameActive = true;
-            lastCheckedId = 0; 
-            
+            isGameActive = true; lastCheckedId = 0; 
             players = {
                 "Pilota 1": { name: "In attesa...", x: COLONNA_PARTENZA, y: RIGA_PARTENZA_P1, penalties: 0, isCrashed: false },
                 "Pilota 2": { name: "In attesa...", x: COLONNA_PARTENZA, y: RIGA_PARTENZA_P2, penalties: 0, isCrashed: false }
             };
-            
             document.getElementById('winner-overlay').style.display = 'none';
-            document.getElementById('log-list').innerHTML = '<li class="log-item" style="color: #666;">Database pulito. Griglia rigenerata!</li>';
+            document.getElementById('log-list').innerHTML = '<li class="log-item" style="color: #666;">Griglia rigenerata! Pronta per i movimenti diagonali.</li>';
             updateUI();
         }
 
         async function fetchNuoveMosse() {
             if (!db || !isGameActive) return;
             try {
-                const { data } = await db
-                    .from('moves')
-                    .select('*')
-                    .gt('id', lastCheckedId)
-                    .order('id', { ascending: true });
-
+                const { data } = await db.from('moves').select('*').gt('id', lastCheckedId).order('id', { ascending: true });
                 if (data && data.length > 0) {
-                    data.forEach(move => {
-                        lastCheckedId = move.id;
-                        gestisciMossa(move.player_name, move.command);
-                    });
+                    data.forEach(move => { lastCheckedId = move.id; gestisciMossa(move.player_name, move.command); });
                 }
-            } catch (err) {
-                console.error(err);
-            }
+            } catch (err) { console.error(err); }
         }
         
         async function init() {
             try {
                 db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 const { data } = await db.from('moves').select('id').order('id', { descending: true }).limit(1);
-                if (data && data.length > 0) {
-                    lastCheckedId = data[0].id;
-                }
-                
+                if (data && data.length > 0) lastCheckedId = data[0].id;
                 isGameActive = true;
                 players = {
                     "Pilota 1": { name: "In attesa...", x: COLONNA_PARTENZA, y: RIGA_PARTENZA_P1, penalties: 0, isCrashed: false },
                     "Pilota 2": { name: "In attesa...", x: COLONNA_PARTENZA, y: RIGA_PARTENZA_P2, penalties: 0, isCrashed: false }
                 };
                 updateUI();
-                
                 setInterval(fetchNuoveMosse, 1000);
-            } catch (e) {
-                document.getElementById('scoreboard').innerText = "Errore: " + e.message;
-            }
+            } catch (e) { document.getElementById('scoreboard').innerText = "Errore: " + e.message; }
         }
-
         init();
     </script>
 </body>
-</html> 
+</html>
