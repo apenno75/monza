@@ -8,7 +8,6 @@
     <style>
         body { font-family: sans-serif; background: #222; color: white; text-align: center; margin: 0; padding: 10px; }
         
-        /* Header e Controlli */
         .header-container { display: flex; justify-content: space-between; align-items: center; max-width: 760px; margin: 0 auto 10px auto; }
         h1 { margin: 0; font-size: 1.8rem; }
         .btn-reset { background: #ff3333; color: white; border: none; padding: 10px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 1rem; }
@@ -17,28 +16,23 @@
         #scoreboard { max-width: 740px; margin: 10px auto; font-size: 1.2rem; background: #333; padding: 10px; border-radius: 8px; min-height: 30px; }
         #game-container { display: flex; justify-content: center; position: relative; }
         
-        /* Griglia e Celle */
         .grid { display: grid; grid-template-columns: repeat(30, 25px); grid-template-rows: repeat(20, 25px); gap: 1px; background: #222; padding: 5px; border: 3px solid #fff; }
         .cell { width: 25px; height: 25px; background: #1a5e1a; display: flex; align-items: center; justify-content: center; font-size: 14px; position: relative; } 
         .track { background: #555; } 
         
-        /* Celle Speciali */
-        .start-line { background: #2e7d32 !important; color: #fff; font-weight: bold; font-size: 11px; } /* Verde scuro partenza */
+        .start-line { background: #2e7d32 !important; color: #fff; font-weight: bold; font-size: 11px; } 
         .finish-line { background: #fff !important; color: #000; font-weight: bold; font-size: 11px; background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 10px 10px; }
         
-        /* Auto Piloti */
         .p1 { background: #ff3333; border-radius: 50%; color: white; font-weight: bold; box-shadow: 0 0 8px #ff3333; z-index: 10; } 
         .p2 { background: #3333ff; border-radius: 50%; color: white; font-weight: bold; box-shadow: 0 0 8px #3333ff; z-index: 10; } 
         .crash { background: #ffaa00 !important; animation: blink 0.3s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-        /* Schermata Vittoria Overlay */
         #winner-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; flex-direction: column; justify-content: center; align-items: center; border-radius: 5px; }
         #winner-box { background: #333; padding: 30px; border-radius: 15px; border: 4px solid #ffcc00; max-width: 400px; box-shadow: 0 0 20px #ffcc00; }
         #winner-box h2 { color: #ffcc00; margin-top: 0; font-size: 2.2rem; }
         #winner-box p { font-size: 1.3rem; margin: 15px 0; }
 
-        /* Feed Scansioni */
         #feed-container { max-width: 760px; margin: 20px auto 0 auto; background: #111; border: 2px solid #444; border-radius: 8px; padding: 15px; text-align: left; }
         #feed-container h3 { margin-top: 0; color: #ffcc00; border-bottom: 1px solid #444; padding-bottom: 5px; }
         #log-list { list-style: none; padding: 0; margin: 0; max-height: 120px; overflow-y: auto; font-family: monospace; }
@@ -59,7 +53,6 @@
     <div id="game-container">
         <div id="grid" class="grid"></div>
         
-        <!-- Schermata Vittoria -->
         <div id="winner-overlay">
             <div id="winner-box">
                 <h2>🏆 TRAGUARDO!</h2>
@@ -86,23 +79,16 @@
         let lastCheckedId = 0; 
         let isGameActive = true;
         
-        // Mappa: 0 = Erba, 1 = Pista, 2 = Partenza, 3 = Arrivo
         const monzaMap = Array(GRID_ROWS).fill(0).map(() => Array(GRID_COLS).fill(0));
         
-        // Rettilineo inferiore (Pista)
+        // Configurazione Pista
         for(let x=4; x<26; x++) { monzaMap[12][x] = 1; monzaMap[13][x] = 1; }
-        // Curva e rettilineo destro
         for(let y=5; y<=12; y++) { monzaMap[y][24] = 1; monzaMap[y][25] = 1; }
-        // Rettilineo superiore
         for(let x=10; x<25; x++) { monzaMap[5][x] = 1; monzaMap[6][x] = 1; }
-        // Curva e rettilineo sinistro
         for(let y=5; y<=13; y++) { monzaMap[y][4] = 1; monzaMap[y][5] = 1; }
         
-        // Posizionamento PARTENZA (x=6, nel rettilineo inferiore)
-        monzaMap[12][6] = 2; monzaMap[13][6] = 2;
-        
-        // Posizionamento ARRIVO (x=9, prima della curva a sinistra per completare il giro)
-        monzaMap[12][9] = 3; monzaMap[13][9] = 3;
+        monzaMap[12][6] = 2; monzaMap[13][6] = 2; // PARTENZA
+        monzaMap[12][9] = 3; monzaMap[13][9] = 3; // ARRIVO
         
         let players = {};
 
@@ -132,7 +118,7 @@
             
             for (let name in players) {
                 let p = players[name];
-                let statoPosizione = monzaMap[p.y][p.x] === 0 ? "⚠️ FUORI PISTA" : "IN PISTA";
+                let statoPosizione = monzaMap[p.y][p.x] === 0 ? "⚠️ INCIDENTE" : "IN PISTA";
                 scoreText += `[P${idx}] ${name} - Penalità: ${p.penalties} (${statoPosizione}) | `;
                 
                 let cell = document.getElementById(`c-${p.x}-${p.y}`);
@@ -143,7 +129,7 @@
                 }
                 idx++;
             }
-            document.getElementById('scoreboard').innerText = scoreText || "Nessun pilota in pista. Invia una mossa dal telefono!";
+            document.getElementById('scoreboard').innerText = scoreText || "Nessun pilota in pista.";
         }
 
         function aggiungiAFeed(pilota, comando) {
@@ -159,7 +145,25 @@
         }
 
         function gestisciMossa(name, command) {
-            if (!isGameActive) return; // Se qualcuno ha vinto, blocca tutto
+            if (!isGameActive) return;
+
+            // Se arriva una mossa da un pilota non censito nei primi due slot predefiniti, lo associamo al primo nome disponibile
+            let playerKey = name;
+            let playerKeys = Object.keys(players);
+            
+            if (!players[name]) {
+                if (playerKeys.includes("Pilota 1") && players["Pilota 1"].name === "In attesa...") {
+                    players[name] = players["Pilota 1"];
+                    players[name].name = name;
+                    delete players["Pilota 1"];
+                } else if (playerKeys.includes("Pilota 2") && players["Pilota 2"].name === "In attesa...") {
+                    players[name] = players["Pilota 2"];
+                    players[name].name = name;
+                    delete players["Pilota 2"];
+                } else if (!playerKeys.includes(name)) {
+                    return; // Slot pieni
+                }
+            }
 
             if (!command || !command.includes(':')) {
                 aggiungiAFeed(name, "COMANDO ERRATO");
@@ -168,61 +172,87 @@
 
             aggiungiAFeed(name, command);
 
-            // Inizializzazione sulla linea di partenza (x=6)
-            if (!players[name]) {
-                let autoAttuali = Object.keys(players).length;
-                if(autoAttuali >= 2) return; 
-                players[name] = { x: 6, y: (autoAttuali === 0 ? 12 : 13), penalties: 0, isCrashed: false };
-            }
-
             let p = players[name];
-            p.isCrashed = false;
+            if (p.isCrashed) return; // Se è in corso l'animazione dell'incidente, ignora i comandi
 
             let [direzione, passi] = command.toUpperCase().trim().split(':');
             passi = parseInt(passi) || 0;
 
-            let targetX = p.x;
-            let targetY = p.y;
+            let stepX = 0;
+            let stepY = 0;
 
-            // NUOVI COMANDI GEOMETRICI DIRETTI
-            if (direzione === 'DESTRA' || direzione === 'AVANTI') targetX += passi;
-            if (direzione === 'SINISTRA' || direzione === 'INDIETRO') targetX -= passi;
-            if (direzione === 'SU') targetY -= passi;
-            if (direzione === 'GIU') targetY += passi;
+            if (direzione === 'DESTRA' || direzione === 'AVANTI') stepX = 1;
+            if (direzione === 'SINISTRA' || direzione === 'INDIETRO') stepX = -1;
+            if (direzione === 'SU') stepY = -1;
+            if (direzione === 'GIU') stepY = 1;
 
-            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
-            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
+            let currentX = p.x;
+            let currentY = p.y;
+            let lastValidX = p.x;
+            let lastValidY = p.y;
+            let uscitoFuori = false;
 
-            p.x = targetX;
-            p.y = targetY;
+            // Movimento passo dopo passo per intercettare il confine preciso dell'erba
+            for (let i = 0; i < passi; i++) {
+                let nextX = Math.max(0, Math.min(GRID_COLS - 1, currentX + stepX));
+                let nextY = Math.max(0, Math.min(GRID_ROWS - 1, currentY + stepY));
 
-            // Controllo fuori pista (erba)
-            if (monzaMap[p.y][p.x] === 0) {
+                if (monzaMap[nextY][nextX] === 0) {
+                    // Cella successiva è erba: fermati qui sulla prima casella d'erba
+                    currentX = nextX;
+                    currentY = nextY;
+                    uscitoFuori = true;
+                    break;
+                } else {
+                    // Resta in pista: aggiorna le ultime coordinate valide
+                    lastValidX = nextX;
+                    lastValidY = nextY;
+                    currentX = nextX;
+                    currentY = nextY;
+                    
+                    // Se passa sul traguardo durante il movimento, si ferma subito
+                    if (monzaMap[currentY][currentX] === 3) {
+                        break;
+                    }
+                }
+            }
+
+            p.x = currentX;
+            p.y = currentY;
+
+            if (uscitoFuori) {
                 p.penalties += 1;
                 p.isCrashed = true;
-            }
+                updateUI();
 
-            updateUI();
+                // Riposizionamento automatico sulla pista dopo 1.2 secondi
+                setTimeout(() => {
+                    p.x = lastValidX;
+                    p.y = lastValidY;
+                    p.isCrashed = false;
+                    updateUI();
+                }, 1200);
+            } else {
+                updateUI();
 
-            // CONTROLLO ARRIVO / VITTORIA (Cella tipo 3)
-            if (monzaMap[p.y][p.x] === 3) {
-                isGameActive = false;
-                document.getElementById('winner-text').innerHTML = `🏁 Il pilota <strong>${name}</strong> vince la gara!<br>Penalità accumulate: ${p.penalties}`;
-                document.getElementById('winner-overlay').style.display = 'flex';
-                return;
-            }
-
-            if(p.isCrashed) {
-                setTimeout(() => { p.isCrashed = false; updateUI(); }, 1000);
+                // Controllo Vittoria
+                if (monzaMap[p.y][p.x] === 3) {
+                    isGameActive = false;
+                    document.getElementById('winner-text').innerHTML = `🏁 Il pilota <strong>${name}</strong> vince la gara!<br>Penalità accumulate: ${p.penalties}`;
+                    document.getElementById('winner-overlay').style.display = 'flex';
+                }
             }
         }
 
-        // FUNZIONE RESET: Riposiziona tutto all'inizio
         function resetGara() {
-            players = {};
             isGameActive = true;
+            // Inizializza i due piloti direttamente sulla linea di partenza
+            players = {
+                "Pilota 1": { name: "In attesa...", x: 6, y: 12, penalties: 0, isCrashed: false },
+                "Pilota 2": { name: "In attesa...", x: 6, y: 13, penalties: 0, isCrashed: false }
+            };
             document.getElementById('winner-overlay').style.display = 'none';
-            document.getElementById('log-list').innerHTML = '<li class="log-item" style="color: #666;">Gara resettata. In attesa di nuove scansioni...</li>';
+            document.getElementById('log-list').innerHTML = '<li class="log-item" style="color: #666;">Gara resettata. Auto schierate in griglia!</li>';
             updateUI();
         }
 
@@ -253,7 +283,7 @@
                 if (data && data.length > 0) {
                     lastCheckedId = data[0].id;
                 }
-                updateUI();
+                resetGara(); // Inizializza subito le vetture visibili alla partenza
                 setInterval(fetchNuoveMosse, 1000);
             } catch (e) {
                 document.getElementById('scoreboard').innerText = "Errore: " + e.message;
