@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Volante F1 QR</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: sans-serif; text-align: center; background: #111; color: white; padding: 20px; margin: 0; }
@@ -32,19 +32,36 @@
     </div>
 
     <script>
-        // CONFIGURAZIONE SUPABASE (Inserisci le stesse credenziali dell'index.html)
-        const SUPABASE_URL = "https://erukzvrtjnvyzjvfuirn.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_FDhQ03affjzeyhCHuoKulg_Rp7PdyLM";
-        //const supabase = client.createClient(SUPABASE_URL, SUPABASE_KEY);
-		const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // CONFIGURAZIONE CREDENZIALI
+    const SUPABASE_URL = "https://erukzvrtjnvyzjvfuirn.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_FDhQ03affjzeyhCHuoKulg_Rp7PdyLM";
+        
+        let db = null;
         let myName = "";
         let html5QrcodeScanner;
 
+        // Questa funzione ora è isolata in cima e non può saltare a causa di errori esterni
         function register() {
             const nameInput = document.getElementById('username').value.trim();
-            if (!nameInput) return alert("Inserisci un nome!");
-            myName = nameInput;
+            if (!nameInput) {
+                alert("Inserisci un nome valido!");
+                return;
+            }
             
+            // Inizializzazione sicura al momento del click
+            try {
+                if (typeof supabase !== 'undefined') {
+                    db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                } else {
+                    alert("Errore: la libreria Supabase non si è caricata correttamente. Controlla la connessione internet.");
+                    return;
+                }
+            } catch (err) {
+                alert("Errore di configurazione database: " + err.message);
+                return;
+            }
+
+            myName = nameInput;
             document.getElementById('setup-zone').style.display = 'none';
             document.getElementById('drive-zone').style.display = 'block';
             document.getElementById('driver-tag').innerText = "Pilota Attivo: " + myName;
@@ -63,12 +80,16 @@
         async function onScanSuccess(decodedText) {
             document.getElementById('status').innerText = "Mossa inviata: " + decodedText;
             
-            // Scrive direttamente la mossa sul database Cloud di Supabase
-            await supabase.from('moves').insert([
-                { player_name: myName, command: decodedText }
-            ]);
+            try {
+                if (db) {
+                    await db.from('moves').insert([
+                        { player_name: myName, command: decodedText }
+                    ]);
+                }
+            } catch (e) {
+                console.error("Errore invio dati: ", e);
+            }
 
-            // Blocca momentaneamente la telecamera per evitare letture doppie dello stesso QR
             html5QrcodeScanner.pause(true);
             setTimeout(() => { html5QrcodeScanner.resume(); }, 2000);
         }
