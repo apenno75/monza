@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monza F1 - Schermo Principale</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
     <style>
         body { font-family: sans-serif; background: #222; color: white; text-align: center; margin: 0; padding: 10px; }
         #scoreboard { margin: 10px 0; font-size: 1.2rem; background: #333; padding: 10px; border-radius: 8px; }
@@ -27,13 +27,15 @@
     </div>
 
     <script>
-        // CONFIGURAZIONE SUPABASE (Sostituisci con i tuoi dati gratuiti)
+        // CONFIGURAZIONE CREDENZIALI
         const SUPABASE_URL = "https://erukzvrtjnvyzjvfuirn.supabase.co";
         const SUPABASE_KEY = "sb_publishable_FDhQ03affjzeyhCHuoKulg_Rp7PdyLM";
-        //const supabase = client.createClient(SUPABASE_URL, SUPABASE_KEY);
-		const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         const GRID_COLS = 30;
         const GRID_ROWS = 20;
+        let lastCheckedId = 0; // Serve per controllare solo le nuove mosse
         
         // Mappa logica di Monza (1 = Pista, 0 = Fuori)
         const monzaMap = Array(GRID_ROWS).fill(0).map(() => Array(GRID_COLS).fill(0));
@@ -78,20 +80,11 @@
             document.getElementById('scoreboard').innerText = scoreText || "In attesa di piloti...";
         }
 
-        // Ascolta in tempo reale le mosse inserite dal database di Supabase
-        supabase
-            .channel('schema-db-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moves' }, payload => {
-                const move = payload.new;
-                gestisciMossa(move.player_name, move.command);
-            })
-            .subscribe();
-
+        // Funzione principale che muove le auto
         function gestisciMossa(name, command) {
-            // Se il giocatore non esiste nella sessione attuale dello schermo, lo crea alla partenza
             if (!players[name]) {
                 let autoAttuali = Object.keys(players).length;
-                if(autoAttuali >= 2) return; // Massimo 2 auto in pista
+                if(autoAttuali >= 2) return; 
                 players[name] = { x: 5, y: (autoAttuali === 0 ? 12 : 13), penalties: 0, isCrashed: false };
             }
 
@@ -99,7 +92,7 @@
             p.isCrashed = false;
 
             let [direzione, passi] = command.split(':');
-            passi = parseInt(passi);
+            passi = parseInt(passi) || 0;
 
             let targetX = p.x;
             let targetY = p.y;
@@ -112,11 +105,9 @@
             targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
             targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
 
-            // REGOLA CONTROLLO FUORI PISTA
             if (monzaMap[targetY][targetX] === 0) {
                 p.penalties += 1;
                 p.isCrashed = true;
-                // La macchina resta dove era (dentro la pista) ma segnala l'incidente
             } else {
                 p.x = targetX;
                 p.y = targetY;
@@ -129,7 +120,44 @@
             }
         }
 
-        drawGrid();
+        // ASCOLTO IN TEMPO REALE (Canale principale)
+        db.channel('moves_channel')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moves' }, payload => {
+                const move = payload.new;
+                if (move.id > lastCheckedId) {
+                    lastCheckedId = move.id;
+                    gestisciMossa(move.player_name, move.command);
+                }
+            })
+            .subscribe();
+
+        // SISTEMA DI SICUREZZA (Controlla ogni 2 secondi se il Realtime si addormenta)
+        async function fetchNuoveMosse() {
+            const { data, error } = await db
+                .from('moves')
+                .select('*')
+                .gt('id', lastCheckedId)
+                .order('id', { ascending: true });
+
+            if (data && data.length > 0) {
+                data.forEach(move => {
+                    lastCheckedId = move.id;
+                    gestisciMossa(move.player_name, move.command);
+                });
+            }
+        }
+        
+        // Sincronizza l'ID iniziale per non rileggere le vecchie partite all'avvio
+        async function init() {
+            const { data } = await db.from('moves').select('id').order('id', { descending: true }).limit(1);
+            if (data && data.length > 0) {
+                lastCheckedId = data[0].id;
+            }
+            drawGrid();
+            setInterval(fetchNuoveMosse, 2000); // Avvia il controllo di sicurezza alternativo
+        }
+
+        init();
     </script>
 </body>
 </html>
